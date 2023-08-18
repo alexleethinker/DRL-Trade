@@ -8,11 +8,14 @@ def check_and_make_directories(directories: list[str]):
         if not os.path.exists("./" + directory):
             os.makedirs("./" + directory)
 
+DATA_SAVE_DIR = "datasets"
+TRAINED_MODEL_DIR = "trained_models"
+TENSORBOARD_LOG_DIR = "tensorboard_log"
+RESULTS_DIR = "results"
+
+
+
 def config_dir():
-    DATA_SAVE_DIR = "datasets"
-    TRAINED_MODEL_DIR = "trained_models"
-    TENSORBOARD_LOG_DIR = "tensorboard_log"
-    RESULTS_DIR = "results"
     check_and_make_directories([DATA_SAVE_DIR, TRAINED_MODEL_DIR, TENSORBOARD_LOG_DIR, RESULTS_DIR])
 
 
@@ -40,24 +43,46 @@ INDICATORS = [
 ]
 
 
+TIMESTEPS = {
+    'a2c' : 10_000, 
+    'ppo' : 10_000, 
+    'ddpg' : 10_000
+    }
 
 # Model Parameters
-A2C_PARAMS = {"n_steps": 5, "ent_coef": 0.01, "learning_rate": 0.0007}
+A2C_PARAMS = {
+    "n_steps": 5, 
+    "ent_coef": 0.01, 
+    "learning_rate": 0.0007
+    }
+
 PPO_PARAMS = {
     "n_steps": 2048,
     "ent_coef": 0.01,
     "learning_rate": 0.00025,
     "batch_size": 64,
-}
-DDPG_PARAMS = {"batch_size": 128, "buffer_size": 50000, "learning_rate": 0.001}
-TD3_PARAMS = {"batch_size": 100, "buffer_size": 1000000, "learning_rate": 0.001}
+    }
+
+DDPG_PARAMS = {
+    "batch_size": 128, 
+    "buffer_size": 50000, 
+    "learning_rate": 0.001
+    }
+
+TD3_PARAMS = {
+    "batch_size": 100, 
+    "buffer_size": 1000000, 
+    "learning_rate": 0.001
+    }
+
 SAC_PARAMS = {
     "batch_size": 64,
     "buffer_size": 100000,
     "learning_rate": 0.0001,
     "learning_starts": 100,
     "ent_coef": "auto_0.1",
-}
+    }
+
 ERL_PARAMS = {
     "learning_rate": 3e-5,
     "batch_size": 2048,
@@ -67,8 +92,13 @@ ERL_PARAMS = {
     "target_step": 5000,
     "eval_gap": 30,
     "eval_times": 64,  # bug fix:KeyError: 'eval_times' line 68, in get_model model.eval_times = model_kwargs["eval_times"]
-}
-RLlib_PARAMS = {"lr": 5e-5, "train_batch_size": 500, "gamma": 0.99}
+    }
+
+RLlib_PARAMS = {
+    "lr": 5e-5, 
+    "train_batch_size": 500, 
+    "gamma": 0.99
+    }
 
 
 # Possible time zones

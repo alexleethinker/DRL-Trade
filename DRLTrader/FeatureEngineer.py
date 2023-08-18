@@ -1,6 +1,6 @@
 
 from finrl.meta.preprocessor.preprocessors import FeatureEngineer
-from DRLTrader.Config import INDICATORS, DATA_SAVE_DIR
+from Config import INDICATORS, DATA_SAVE_DIR
 import numpy as np
 
 

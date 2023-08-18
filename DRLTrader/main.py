@@ -4,36 +4,38 @@ warnings.filterwarnings("ignore")
 import pandas as pd
 from finrl.agents.stablebaselines3.models import DRLEnsembleAgent
 
-from DRLTrader.Config import (
-    INDICATORS,
-    TRAIN_START_DATE,
-    TRAIN_END_DATE,
-    TEST_START_DATE,
-    TEST_END_DATE,
-)
+from Config import INDICATORS
+from Config import TRAIN_START_DATE, TRAIN_END_DATE, TEST_START_DATE, TEST_END_DATE
+from Config import A2C_PARAMS, PPO_PARAMS, DDPG_PARAMS,TIMESTEPS
+import DataLoader
+from FeatureEngineer import feature_engieering
+
+
+
+df = DataLoader.download()
+processed = feature_engieering(df)
+
 
 
 stock_dimension = len(processed.tic.unique())
 state_space = 1 + 2*stock_dimension + len(INDICATORS)*stock_dimension
 
-
 env_kwargs = {
-    "hmax": 100, 
     "initial_amount": 1000000, 
     "buy_cost_pct": 0.001, 
     "sell_cost_pct": 0.001, 
-    "state_space": state_space, 
     "stock_dim": stock_dimension, 
-    "tech_indicator_list": INDICATORS,
     "action_space": stock_dimension, 
+    "state_space": state_space, 
+    "tech_indicator_list": INDICATORS,
+    "hmax": 100, 
     "reward_scaling": 1e-4,
-    "print_verbosity":1
-    
+    "print_verbosity":1   
 }
-
 
 rebalance_window = 63 # rebalance_window is the number of days to retrain the model
 validation_window = 63 # validation_window is the number of days to do validation and trading (e.g. if validation_window=63, then both validation and trading period will be 63 days)
+
 
 ensemble_agent = DRLEnsembleAgent(df=processed,
                  train_period=(TRAIN_START_DATE,TRAIN_END_DATE),
@@ -43,38 +45,16 @@ ensemble_agent = DRLEnsembleAgent(df=processed,
                  **env_kwargs)
 
 
-A2C_model_kwargs = {
-                    'n_steps': 5,
-                    'ent_coef': 0.005,
-                    'learning_rate': 0.0007
-                    }
 
-PPO_model_kwargs = {
-                    "ent_coef":0.01,
-                    "n_steps": 2048,
-                    "learning_rate": 0.00025,
-                    "batch_size": 128
-                    }
-
-DDPG_model_kwargs = {
-                      #"action_noise":"ornstein_uhlenbeck",
-                      "buffer_size": 10_000,
-                      "learning_rate": 0.0005,
-                      "batch_size": 64
-                    }
+df_summary = ensemble_agent.run_ensemble_strategy(A2C_PARAMS,
+                                                 PPO_PARAMS,
+                                                 DDPG_PARAMS,
+                                                 TIMESTEPS)
 
 
 
-timesteps_dict = {'a2c' : 10_000, 
-                 'ppo' : 10_000, 
-                 'ddpg' : 10_000
-                 }
 
 
-df_summary = ensemble_agent.run_ensemble_strategy(A2C_model_kwargs,
-                                                 PPO_model_kwargs,
-                                                 DDPG_model_kwargs,
-                                                 timesteps_dict)
 
 
 
