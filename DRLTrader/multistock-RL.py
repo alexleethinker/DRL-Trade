@@ -1,68 +1,17 @@
 import warnings
 warnings.filterwarnings("ignore")
 
-
 import pandas as pd
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-# matplotlib.use('Agg')
-import datetime
+from finrl.agents.stablebaselines3.models import DRLEnsembleAgent
 
-from finrl.config_tickers import DOW_30_TICKER
-from finrl.meta.preprocessor.yahoodownloader import YahooDownloader
-from finrl.meta.preprocessor.preprocessors import FeatureEngineer, data_split
-from finrl.meta.env_stock_trading.env_stocktrading import StockTradingEnv
-from finrl.agents.stablebaselines3.models import DRLAgent,DRLEnsembleAgent
-from finrl.plot import backtest_stats, backtest_plot, get_daily_return, get_baseline
-
-from pprint import pprint
-
-import sys
-sys.path.append("../FinRL-Library")
-
-import itertools
-
-import os
-from finrl.main import check_and_make_directories
-from finrl.config import (
-    DATA_SAVE_DIR,
-    TRAINED_MODEL_DIR,
-    TENSORBOARD_LOG_DIR,
-    RESULTS_DIR,
+from DRLTrader.Config import (
     INDICATORS,
     TRAIN_START_DATE,
     TRAIN_END_DATE,
     TEST_START_DATE,
     TEST_END_DATE,
-    TRADE_START_DATE,
-    TRADE_END_DATE,
 )
 
-check_and_make_directories([DATA_SAVE_DIR, TRAINED_MODEL_DIR, TENSORBOARD_LOG_DIR, RESULTS_DIR])
-
-
-TRAIN_START_DATE = '2010-01-01'
-TRAIN_END_DATE = '2021-10-01'
-TEST_START_DATE = '2021-10-01'
-TEST_END_DATE = '2023-08-17'
-
-df = YahooDownloader(start_date = TRAIN_START_DATE,
-                     end_date = TEST_END_DATE,
-                     ticker_list = DOW_30_TICKER).fetch_data()
-
-
-
-
-fe = FeatureEngineer(use_technical_indicator=True,
-                     tech_indicator_list = INDICATORS,
-                     use_turbulence=True,
-                     user_defined_feature = False)
-
-processed = fe.preprocess_data(df)
-processed = processed.copy()
-processed = processed.fillna(0)
-processed = processed.replace(np.inf,0)
 
 stock_dimension = len(processed.tic.unique())
 state_space = 1 + 2*stock_dimension + len(INDICATORS)*stock_dimension
