@@ -1,73 +1,102 @@
-from enum import Enum
-import pandas as pd
 import numpy as np
-
 import gymnasium as gym
 from gymnasium import spaces
 
-import matplotlib.pyplot as plt
 
-
-from base import TransactionCost
-
-
-class TradingAction(Enum):
-    Buy = 1
-    Hold = 0
-    Sell = -1
-
-
-class Positions(Enum):
-    Short = 0
-    Long = 1
-
-    def opposite(self):
-        return Positions.Short if self == Positions.Long else Positions.Long
-
-
-class TradingEnv(gym.Env):
-    
-    def __init__(self,
-                 data_provider: BaseDataProvider,
-                 reward_strategy: BaseRewardStrategy = IncrementalProfit,
-                 transaction_cost: TransactionCost = TransactionCost,
-                 initial_balance: int = 100000,
-                 commissionPercent: float = 0.25,
-                 maxSlippagePercent: float = 2.0,
-                 **kwargs):
+class StockTradingEnv(gym.Env):
+    def __init__(self, data, initial_balance=10000, commission_fee=0.01, slippage_cost=0.1):
+        super(StockTradingEnv, self).__init__()
+        self.data = data
+        self.current_step = 0
+        self.initial_balance = initial_balance
+        self.balance = self.initial_balance
+        self.stock_owned = 0
+        self.stock_price_history = data['stock_price']
+        self.moving_average_10 = data['moving_average_10']
+        self.moving_average_30 = data['moving_average_30']
+        self.relative_strength_index = data['relative_strength_index']
+        self.commission_fee = commission_fee
+        self.slippage_cost = slippage_cost
         
-        self.logger = kwargs.get('logger', init_logger(__name__, show_debug=kwargs.get('show_debug', True)))
+        self.action_space = spaces.Box(low=np.array([-1, 0]), high=np.array([1, 1]), shape=(2,))  # (Amount, Action) where Action: -1: Buy, 0: Hold, 1: Sell
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(5,))
+        
+    def reset(self):
+        self.current_step = 0
+        self.balance = self.initial_balance
+        self.stock_owned = 0
+        return self._get_observation()
+    
+    def step(self, action):
+        assert self.action_space.contains(action)
 
-        self.base_precision: int = kwargs.get('base_precision', 2)
-        self.asset_precision: int = kwargs.get('asset_precision', 8)
-        self.min_cost_limit: float = kwargs.get('min_cost_limit', 1E-3)
-        self.min_amount_limit: float = kwargs.get('min_amount_limit', 1E-3)
+        
 
-        self.initial_balance = round(initial_balance, self.base_precision)
-        self.commissionPercent = commissionPercent
-        self.maxSlippagePercent = maxSlippagePercent
+        prev_portfolio_value = self.balance + self.stock_owned * self.stock_price_history[self.current_step - 1]
+        current_price = self.stock_price_history[self.current_step]
+        
+        amount = int(self.initial_balance * action[1] / current_price)
+        
+        
+        if action[0] > 0:  # Buy
+            amount =  min( int(self.initial_balance * action[1] / current_price), int(self.balance / current_price * (1 + self.commission_fee + self.slippage_cost)))
+            if self.balance >= current_price * amount * (1 + self.commission_fee + self.slippage_cost):
+                self.stock_owned += amount
+                self.balance -= current_price * amount * (1 + self.commission_fee + self.slippage_cost)
+        elif action[0] < 0:  # Sell
+            amount = min(amount, self.stock_owned)
+            if self.stock_owned > 0:
+                self.stock_owned -= amount
+                self.balance += current_price * amount * (1 - self.commission_fee - self.slippage_cost)
+        
+        print( 'buy' if action[0] > 0 else 'sell',  amount)
+        self.render()
+        current_portfolio_value = self.balance + self.stock_owned * current_price
+        
+        excess_return = current_portfolio_value - prev_portfolio_value
+        
+        risk_free_rate = 0.02  # Example risk-free rate
+        std_deviation = np.std(self.stock_price_history[:self.current_step+1])
+        sharpe_ratio = (excess_return - risk_free_rate) / std_deviation if std_deviation != 0 else 0
+        reward = sharpe_ratio
+        
+        self.current_step += 1
+        
+        if self.current_step == len(self.data['stock_price']):
+            done = True
+        else:
+            done = False
+        
+        info = {}
+        
+        return self._get_observation(), reward, done, info
+    
+    def _get_observation(self):
+        return np.array([
+            self.balance,
+            self.stock_owned,
+            self.stock_price_history[self.current_step],
+            self.moving_average_10[self.current_step],
+            self.relative_strength_index[self.current_step]
+        ])
+    
+    def render(self, mode='human'):
+        current_price = self.stock_price_history[self.current_step]
+        print(f"Step: {self.current_step}, Balance: {self.balance:.2f}, Stock Owned: {self.stock_owned}, Stock Price: {current_price:.2f}")
 
-        self.data_provider = data_provider
-        self.reward_strategy = reward_strategy()
-        self.transaction_cost = TransactionCost(commissionPercent=self.commissionPercent,
-                                             maxSlippagePercent=self.maxSlippagePercent,
-                                             base_precision=self.base_precision,
-                                             asset_precision=self.asset_precision,
-                                             min_cost_limit=self.min_cost_limit,
-                                             min_amount_limit=self.min_amount_limit)
+# Example data for stock prices and technical indicators
+data = {
+    'stock_price': [50, 55, 60, 65, 70, 50, 55, 60, 65, 70],
+    'moving_average_10': [52, 54, 58, 62, 66, 50, 55, 60, 65, 70],  # 10-day moving average
+    'moving_average_30': [49, 51, 54, 57, 61, 50, 55, 60, 65, 70],  # 30-day moving average
+    'relative_strength_index': [40, 50, 60, 70, 80, 50, 55, 60, 65, 70]  # RSI values
+}
 
-        self.render_benchmarks: List[Dict] = kwargs.get('render_benchmarks', [])
-        self.normalize_obs: bool = kwargs.get('normalize_obs', True)
-        self.stationarize_obs: bool = kwargs.get('stationarize_obs', True)
-        self.normalize_rewards: bool = kwargs.get('normalize_rewards', False)
-        self.stationarize_rewards: bool = kwargs.get('stationarize_rewards', True)
+env = StockTradingEnv(data, initial_balance=100000, commission_fee=0.0001, slippage_cost=0.005)
 
-        self.n_discrete_actions: int = kwargs.get('n_discrete_actions', 24)
-        self.action_space = spaces.Discrete(self.n_discrete_actions)
+observation = env.reset()
+for _ in range(len(data['stock_price']) - 1):
+      # Display current state
+    action = env.action_space.sample()  # Random action for demonstration
+    observation, reward, done, info = env.step(action)
 
-        self.n_features = 6 + len(self.data_provider.columns)
-        self.obs_shape = (1, self.n_features)
-        self.observation_space = spaces.Box(low=0, high=1, shape=self.obs_shape, dtype=np.float16)
-
-        self.observations = pd.DataFrame(None, columns=self.data_provider.columns)
-       
