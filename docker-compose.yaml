@@ -1,7 +1,0 @@
-version: "3.7"
-services:
-  drl-agent:
-    image: finrl
-    command: python multistock-RL.py
-    volumes:
-      - ./:/src
